@@ -1,8 +1,8 @@
 #ifndef CANVAS_H
 #define CANVAS_H
 
-#define ROWS 30
-#define COLS 80
+#define CANVAS_ROWS 30
+#define CANVAS_COLS 80
 #define EMPTY ' '
 
 void canvas_init(void);
