@@ -13,13 +13,7 @@ int main(void) {
     curs_set(0);
 
     canvas_init();
-
-    /* Demo shapes */
-    draw_line(2, 2, 2, 30, '_');
-    draw_rectangle(5, 5, 8, 20);
-    draw_circle(14, 55, 7);
-    draw_triangle(22, 30, 27, 20, 27, 40);
-
+    shapes_init();
     canvas_display();
     ui_run();
 
