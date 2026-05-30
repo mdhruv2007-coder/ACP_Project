@@ -24,19 +24,25 @@ char canvas_get(int row, int col) {
     return EMPTY;
 }
 
+/* Returns 1 if (row,col) is a valid canvas coordinate, 0 otherwise. */
+int canvas_in_bounds(int row, int col) {
+    return (row >= 0 && row < CANVAS_ROWS && col >= 0 && col < CANVAS_COLS);
+}
+
 void canvas_display(void) {
     for (int r = 0; r < CANVAS_ROWS; r++)
         for (int c = 0; c < CANVAS_COLS; c++)
             mvaddch(r + 1, c + 1, canvas[r][c]);
 
+    /* Canvas border */
     mvhline(0,              0, ACS_HLINE, CANVAS_COLS + 2);
     mvhline(CANVAS_ROWS + 1, 0, ACS_HLINE, CANVAS_COLS + 2);
     mvvline(0,              0, ACS_VLINE, CANVAS_ROWS + 2);
     mvvline(0, CANVAS_COLS + 1, ACS_VLINE, CANVAS_ROWS + 2);
-    mvaddch(0,              0,             ACS_ULCORNER);
-    mvaddch(0,              CANVAS_COLS+1, ACS_URCORNER);
-    mvaddch(CANVAS_ROWS+1,  0,             ACS_LLCORNER);
-    mvaddch(CANVAS_ROWS+1,  CANVAS_COLS+1, ACS_LRCORNER);
+    mvaddch(0,             0,             ACS_ULCORNER);
+    mvaddch(0,             CANVAS_COLS+1, ACS_URCORNER);
+    mvaddch(CANVAS_ROWS+1, 0,             ACS_LLCORNER);
+    mvaddch(CANVAS_ROWS+1, CANVAS_COLS+1, ACS_LRCORNER);
     refresh();
 }
 

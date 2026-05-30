@@ -4,4 +4,4 @@
 void ui_run(void);
 void ui_status(const char *msg);
 
-#endif
+#endif /* UI_H */

@@ -2,6 +2,7 @@
 #include "../include/canvas.h"
 #include <ncurses.h>
 #include <stdio.h>
+#include <string.h>
 
 /* ── Shape store ─────────────────────────────────────────────────────── */
 static Shape shapes[MAX_SHAPES];
@@ -95,7 +96,6 @@ void shapes_init(void) {
  * ───────────────────────────────────────────────────────────────────── */
 int add_shape(Shape s) {
     if (shape_count >= MAX_SHAPES) return -1;
-    /* Find first free slot */
     for (int i = 0; i < MAX_SHAPES; i++) {
         if (!shapes[i].active) {
             s.id     = next_id++;
@@ -122,7 +122,7 @@ int delete_shape(int id) {
             return 0;
         }
     }
-    return -1;   /* not found */
+    return -1;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -160,27 +160,96 @@ void redraw_all(void) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * list_shapes — show all active shapes in the status area
+ * panel_draw_shapes — render shape list in the right-side panel.
+ *
+ * Layout (PANEL_COL is defined in canvas.h):
+ *
+ *   col PANEL_COL
+ *   ┌─ Shapes (n/50) ──────┐
+ *   │ #1  Line   r1,c1     │
+ *   │ #2  Rect   r1,c1     │
+ *   │  ...                 │
+ *   └──────────────────────┘
+ *
+ * The panel occupies rows 0 .. CANVAS_ROWS+1 (same height as canvas).
  * ───────────────────────────────────────────────────────────────────── */
-void list_shapes(void) {
-    const char *names[] = {"", "Line", "Rect", "Circle", "Triangle"};
-    move(CANVAS_ROWS + 3, 0);
-    clrtoeol();
+void panel_draw_shapes(void) {
+    const char *names[] = {"", "Line", "Rect", "Circ", "Tri "};
+    int max_rows = CANVAS_ROWS;   /* how many shape rows fit in panel */
+
+    /* Panel border */
+    mvhline(0,             PANEL_COL - 1, ACS_HLINE, PANEL_W + 2);
+    mvhline(CANVAS_ROWS+1, PANEL_COL - 1, ACS_HLINE, PANEL_W + 2);
+    mvvline(0,             PANEL_COL - 1, ACS_VLINE, CANVAS_ROWS + 2);
+    mvvline(0,             PANEL_COL + PANEL_W, ACS_VLINE, CANVAS_ROWS + 2);
+    mvaddch(0,             PANEL_COL - 1,         ACS_ULCORNER);
+    mvaddch(0,             PANEL_COL + PANEL_W,   ACS_URCORNER);
+    mvaddch(CANVAS_ROWS+1, PANEL_COL - 1,         ACS_LLCORNER);
+    mvaddch(CANVAS_ROWS+1, PANEL_COL + PANEL_W,   ACS_LRCORNER);
+
+    /* Header */
+    mvprintw(0, PANEL_COL, " Shapes %d/%-2d ", shape_count, MAX_SHAPES);
+
+    /* Clear panel interior */
+    for (int r = 1; r <= CANVAS_ROWS; r++) {
+        move(r, PANEL_COL);
+        for (int c = 0; c < PANEL_W; c++) addch(' ');
+    }
+
     if (shape_count == 0) {
-        mvprintw(CANVAS_ROWS + 3, 1, "No shapes on canvas.");
+        mvprintw(1, PANEL_COL, " (empty canvas)");
         refresh();
         return;
     }
-    int col = 1;
-    for (int i = 0; i < MAX_SHAPES; i++) {
-        if (shapes[i].active) {
-            mvprintw(CANVAS_ROWS + 3, col, "[%d]%s ",
-                     shapes[i].id, names[shapes[i].type]);
-            col += 10;
-            if (col > 70) break;   /* avoid overflow */
+
+    /* Column headers */
+    mvprintw(1, PANEL_COL, " ID  Type  Coords");
+
+    int display_row = 2;
+    for (int i = 0; i < MAX_SHAPES && display_row <= max_rows; i++) {
+        if (!shapes[i].active) continue;
+        const Shape *s = &shapes[i];
+        const char  *nm = (s->type >= 1 && s->type <= 4) ? names[s->type] : "????";
+
+        switch (s->type) {
+            case SHAPE_LINE:
+                mvprintw(display_row, PANEL_COL,
+                         " #%-2d %s  (%d,%d)->(%d,%d)",
+                         s->id, nm, s->r1, s->c1, s->r2, s->c2);
+                break;
+            case SHAPE_RECTANGLE:
+                mvprintw(display_row, PANEL_COL,
+                         " #%-2d %s  (%d,%d) %dx%d",
+                         s->id, nm, s->r1, s->c1, s->r2, s->c2);
+                break;
+            case SHAPE_CIRCLE:
+                mvprintw(display_row, PANEL_COL,
+                         " #%-2d %s  ctr(%d,%d) r=%d",
+                         s->id, nm, s->r1, s->c1, s->radius);
+                break;
+            case SHAPE_TRIANGLE:
+                mvprintw(display_row, PANEL_COL,
+                         " #%-2d %s  (%d,%d)(%d,%d)(%d,%d)",
+                         s->id, nm,
+                         s->r1, s->c1, s->r2, s->c2, s->r3, s->c3);
+                break;
         }
+        display_row++;
     }
+
+    /* Scroll hint if more shapes than panel rows */
+    if (shape_count > max_rows - 2) {
+        mvprintw(CANVAS_ROWS, PANEL_COL, " ... use 'l' to list all");
+    }
+
     refresh();
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * list_shapes — kept for backwards-compat; delegates to panel
+ * ───────────────────────────────────────────────────────────────────── */
+void list_shapes(void) {
+    panel_draw_shapes();
 }
 
 int get_shape_count(void) { return shape_count; }

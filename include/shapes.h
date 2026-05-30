@@ -34,7 +34,8 @@ int    delete_shape(int id);        /* returns 0 ok, -1 not found       */
 Shape *find_shape(int id);          /* returns pointer or NULL          */
 int    modify_shape(int id, Shape updated); /* 0 ok, -1 not found      */
 void   redraw_all(void);            /* clear canvas, redraw every shape */
-void   list_shapes(void);           /* print shape list to status area  */
+void   list_shapes(void);           /* kept for compatibility           */
+void   panel_draw_shapes(void);     /* render shape list in right panel */
 int    get_shape_count(void);
 
-#endif
+#endif /* SHAPES_H */
