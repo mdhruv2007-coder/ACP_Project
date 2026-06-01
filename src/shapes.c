@@ -9,6 +9,10 @@ static Shape shapes[MAX_SHAPES];
 static int   shape_count = 0;
 static int   next_id     = 1;
 
+/* ── Undo buffer (single-level — stores last deleted shape) ──────────── */
+static Shape undo_buf;
+static int   undo_available = 0;   /* 1 = undo_buf holds a deleted shape */
+
 /* ─────────────────────────────────────────────────────────────────────
  * Drawing primitives
  * ───────────────────────────────────────────────────────────────────── */
@@ -42,6 +46,16 @@ void draw_rectangle(int r, int c, int h, int w) {
     canvas_set(r + h - 1, c + w - 1, '*');
 }
 
+/* Filled rectangle: outline using draw_rectangle, then flood interior.
+ * Interior is rows r+1 .. r+h-2, cols c+1 .. c+w-2.
+ * fill_ch is the character used for the interior.                      */
+void draw_rectangle_filled(int r, int c, int h, int w, char fill_ch) {
+    draw_rectangle(r, c, h, w);   /* draw the border first */
+    for (int row = r + 1; row <= r + h - 2; row++)
+        for (int col = c + 1; col <= c + w - 2; col++)
+            canvas_set(row, col, fill_ch);
+}
+
 void draw_circle(int cr, int cc, int radius) {
     int x = 0, y = radius, p = 1 - radius;
     while (x <= y) {
@@ -72,6 +86,9 @@ static void render_shape(const Shape *s) {
         case SHAPE_RECTANGLE:
             draw_rectangle(s->r1, s->c1, s->r2, s->c2);
             break;
+        case SHAPE_RECT_FILLED:
+            draw_rectangle_filled(s->r1, s->c1, s->r2, s->c2, s->ch);
+            break;
         case SHAPE_CIRCLE:
             draw_circle(s->r1, s->c1, s->radius);
             break;
@@ -82,17 +99,18 @@ static void render_shape(const Shape *s) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * shapes_init — clear the shape store
+ * shapes_init — clear the shape store and undo buffer
  * ───────────────────────────────────────────────────────────────────── */
 void shapes_init(void) {
     for (int i = 0; i < MAX_SHAPES; i++)
         shapes[i].active = 0;
-    shape_count = 0;
-    next_id     = 1;
+    shape_count    = 0;
+    next_id        = 1;
+    undo_available = 0;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * add_shape — store a shape, assign it an id, render it
+ * add_shape
  * ───────────────────────────────────────────────────────────────────── */
 int add_shape(Shape s) {
     if (shape_count >= MAX_SHAPES) return -1;
@@ -111,11 +129,13 @@ int add_shape(Shape s) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * delete_shape — mark as inactive, redraw everything
+ * delete_shape — saves deleted shape to undo buffer before removing
  * ───────────────────────────────────────────────────────────────────── */
 int delete_shape(int id) {
     for (int i = 0; i < MAX_SHAPES; i++) {
         if (shapes[i].active && shapes[i].id == id) {
+            undo_buf       = shapes[i];   /* save for undo */
+            undo_available = 1;
             shapes[i].active = 0;
             shape_count--;
             redraw_all();
@@ -126,7 +146,33 @@ int delete_shape(int id) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * find_shape — return pointer to shape with given id, or NULL
+ * undo_last_delete — re-inserts the last deleted shape.
+ * The restored shape gets a NEW id (next_id) so it doesn't clash.
+ * Returns the new id on success, -1 if nothing to undo or canvas full.
+ * ───────────────────────────────────────────────────────────────────── */
+int undo_last_delete(void) {
+    if (!undo_available)        return -1;
+    if (shape_count >= MAX_SHAPES) return -1;
+
+    Shape s    = undo_buf;
+    s.active   = 1;
+    s.id       = next_id++;     /* fresh id */
+    undo_available = 0;         /* one-shot — consumed */
+
+    for (int i = 0; i < MAX_SHAPES; i++) {
+        if (!shapes[i].active) {
+            shapes[i] = s;
+            shape_count++;
+            render_shape(&shapes[i]);
+            canvas_display();
+            return s.id;
+        }
+    }
+    return -1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * find_shape
  * ───────────────────────────────────────────────────────────────────── */
 Shape *find_shape(int id) {
     for (int i = 0; i < MAX_SHAPES; i++)
@@ -136,7 +182,7 @@ Shape *find_shape(int id) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * modify_shape — replace fields, keep same id, redraw
+ * modify_shape
  * ───────────────────────────────────────────────────────────────────── */
 int modify_shape(int id, Shape updated) {
     Shape *s = find_shape(id);
@@ -149,7 +195,7 @@ int modify_shape(int id, Shape updated) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * redraw_all — wipe canvas, re-render every active shape
+ * redraw_all
  * ───────────────────────────────────────────────────────────────────── */
 void redraw_all(void) {
     canvas_clear();
@@ -160,22 +206,11 @@ void redraw_all(void) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- * panel_draw_shapes — render shape list in the right-side panel.
- *
- * Layout (PANEL_COL is defined in canvas.h):
- *
- *   col PANEL_COL
- *   ┌─ Shapes (n/50) ──────┐
- *   │ #1  Line   r1,c1     │
- *   │ #2  Rect   r1,c1     │
- *   │  ...                 │
- *   └──────────────────────┘
- *
- * The panel occupies rows 0 .. CANVAS_ROWS+1 (same height as canvas).
+ * panel_draw_shapes
  * ───────────────────────────────────────────────────────────────────── */
 void panel_draw_shapes(void) {
-    const char *names[] = {"", "Line", "Rect", "Circ", "Tri "};
-    int max_rows = CANVAS_ROWS;   /* how many shape rows fit in panel */
+    const char *names[] = {"", "Line", "Rect", "Circ", "Tri ", "Fill"};
+    int max_rows = CANVAS_ROWS;
 
     /* Panel border */
     mvhline(0,             PANEL_COL - 1, ACS_HLINE, PANEL_W + 2);
@@ -187,7 +222,7 @@ void panel_draw_shapes(void) {
     mvaddch(CANVAS_ROWS+1, PANEL_COL - 1,         ACS_LLCORNER);
     mvaddch(CANVAS_ROWS+1, PANEL_COL + PANEL_W,   ACS_LRCORNER);
 
-    /* Header */
+    /* Header — shows live count */
     mvprintw(0, PANEL_COL, " Shapes %d/%-2d ", shape_count, MAX_SHAPES);
 
     /* Clear panel interior */
@@ -202,14 +237,14 @@ void panel_draw_shapes(void) {
         return;
     }
 
-    /* Column headers */
     mvprintw(1, PANEL_COL, " ID  Type  Coords");
 
     int display_row = 2;
     for (int i = 0; i < MAX_SHAPES && display_row <= max_rows; i++) {
         if (!shapes[i].active) continue;
-        const Shape *s = &shapes[i];
-        const char  *nm = (s->type >= 1 && s->type <= 4) ? names[s->type] : "????";
+        const Shape *s  = &shapes[i];
+        int          ti = (s->type >= 1 && s->type <= 5) ? s->type : 0;
+        const char  *nm = names[ti];
 
         switch (s->type) {
             case SHAPE_LINE:
@@ -218,9 +253,10 @@ void panel_draw_shapes(void) {
                          s->id, nm, s->r1, s->c1, s->r2, s->c2);
                 break;
             case SHAPE_RECTANGLE:
+            case SHAPE_RECT_FILLED:
                 mvprintw(display_row, PANEL_COL,
-                         " #%-2d %s  (%d,%d) %dx%d",
-                         s->id, nm, s->r1, s->c1, s->r2, s->c2);
+                         " #%-2d %s  (%d,%d) %dx%d '%c'",
+                         s->id, nm, s->r1, s->c1, s->r2, s->c2, s->ch);
                 break;
             case SHAPE_CIRCLE:
                 mvprintw(display_row, PANEL_COL,
@@ -237,19 +273,12 @@ void panel_draw_shapes(void) {
         display_row++;
     }
 
-    /* Scroll hint if more shapes than panel rows */
-    if (shape_count > max_rows - 2) {
-        mvprintw(CANVAS_ROWS, PANEL_COL, " ... use 'l' to list all");
-    }
+    if (shape_count > max_rows - 2)
+        mvprintw(CANVAS_ROWS, PANEL_COL, " ... use 'l' to refresh");
 
     refresh();
 }
 
-/* ─────────────────────────────────────────────────────────────────────
- * list_shapes — kept for backwards-compat; delegates to panel
- * ───────────────────────────────────────────────────────────────────── */
-void list_shapes(void) {
-    panel_draw_shapes();
-}
+void list_shapes(void) { panel_draw_shapes(); }
 
 int get_shape_count(void) { return shape_count; }
