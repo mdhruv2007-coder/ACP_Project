@@ -1,0 +1,50 @@
+List of prompts given to the ai agent used
+prompt 1:
+Act like a student who is skilled in C programming but beginner in GUI programming and is a bit lazy, this is for his ACP assignment for 5 marks,
+ he needs to build a 2D graphics editor in C using ncurses library, he needs to use C best practices and clean code, and the project should be well-documented and easy to understand.
+ this is the question of the project
+ Requirements:
+
+Create a repository in GitHub.
+Submit the link to the GitHub repository in Moodle. (In the online text field provided in the assignment)
+Daily push to GitHub is mandatory.
+Evaluation Rubrics:
+
+Total marks: 5
+Copied Caught -  0 marks.
+No submission - 1 mark. 
+Copied  - 2 marks.
+Original partially complete - 3 marks.
+Original almost complete - 4 marks.
+Original Complete - 5 marks.
+Problem Statement: Design and implement a menu-driven 2D Graphics Editor in C using a 2D character array as the drawing canvas. The canvas should initially be filled with the character _ (underscore), and graphical objects should be drawn using the character * (asterisk).
+
+Write functions to draw a circle, rectangle, line, and triangle.
+You should be able to
+      add objects to the picture,
+      delete objects from the picture, and
+       modify objects in the picture.
+Use a 2d array of characters to store the picture.
+Write a function to display the picture.
+
+Additionally, you can use the ncurses package to create menus and draw pictures.
+
+soo i want you to create the implementation plan and design the repo structure.
+
+prompt 2: ok now explain all the files which are needed for this project and explain the purpose of each files.
+
+prompt 3:Ok create all the required files one by on and explain/decode the files contents one by one and explain the code line by line and ask me do you want any changes or not after
+each file.
+
+prompt 4:give me the set of commands which is required to make the project, run it and then do final push to the git and after all this present me the complete code base, do not
+miss any step.
+
+prompt 5: now that the project is done, can you tell me the proper coordinates for testing the project and if there any development possible, suggest me the development ideas.
+
+prompt 6: the canvas is a little off to the right side lets set in the right side and make it align with the window.
+
+prompt 7: now give me the proper coordinated to test the editor and show me the expected output.
+
+prompt 8: All the code has been working properly and i have decoded it line by line now just explain me the complete code base in a summary. 
+
+prompt 9: Everything runs succesfully let do a final push and add the edited readme file.
